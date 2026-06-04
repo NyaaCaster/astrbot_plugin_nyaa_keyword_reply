@@ -32,6 +32,9 @@ try:
 except ImportError:
     from astrbot.api.event.filter import EventMessageType
 
+__author__ = "NyaaCaster"
+__signature__ = "Nyaa be with you."
+
 
 @register(
     "astrbot_plugin_nyaa_keyword_reply",
