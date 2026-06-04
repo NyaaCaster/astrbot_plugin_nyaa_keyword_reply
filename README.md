@@ -1,23 +1,38 @@
 # astrbot_plugin_nyaa_keyword_reply
 
-> Nyaa简易关键字回复 —— 让 AstrBot 在群里像真人群友一样，根据群成员发言里的关键词主动接话。
+> Nyaa简易关键字回复 —— 让群成员的关键词，按机器人**原生唤醒**逻辑触发回复。
 
-监听群聊消息，当群成员的发言命中你配置的关键词时，Bot 会**引用**并 **@** 这位成员，调用当前会话的 LLM 生成一句自然的回复（参考 Bot 被 @ 时的对话方式）。也支持纯固定文本回复。
+监听群聊消息，当群成员发言命中你配置的关键词时，把这条消息**标记为"已唤醒机器人"**（等同于该消息 @ 了机器人），随后**完全交还给 AstrBot 原生流程**处理。回复内容、人格、上下文记忆、函数工具、@/引用格式等，**全部由机器人自身的配置决定**，本插件不参与。
 
-## 功能特性
+## 设计理念
 
-- 🔑 **关键词触发**：普通包含匹配 + 正则匹配，二者可同时配置。
-- 💬 **引用 + @ + LLM 回复**：命中后以「引用原消息 + @对方 + LLM 生成内容」的形式回复。
-- 🧠 **复用现有 LLM**：直接调用 AstrBot 当前会话的提供商与人格设定，无需另配 API。
-- 📌 **固定回复**：可为特定关键词配置写死的回复，命中时优先于 LLM。
-- 🛡️ **防打扰**：同群冷却、触发概率、群白名单、最大消息长度等开关。
-- 🚦 **不重复回复**：消息若本身已 @ Bot 或命中唤醒词，则交给主管道，本插件不介入。
+本插件**不是**一个独立的问答机器人，它只是一个**触发器**：
+
+- ❌ 不持有自己的 LLM、API Key、system prompt 或人格设定；
+- ❌ 不自己组装回复文本，也不自己决定 @ / 引用格式；
+- ✅ 只在 AstrBot 原有的「唤醒」逻辑上，额外允许任意群成员用关键词触发与「被 @」完全相同的回复路径。
+
+换句话说：**群友说出关键词 == 群友 @ 了机器人**，之后的一切都走 AstrBot 原生流程。
+
+## 工作原理
+
+AstrBot 的消息管道顺序为：
+`WakingCheckStage → WhitelistCheck → SessionStatusCheck → RateLimit → ContentSafety → PreProcess → ProcessStage → ...`
+
+在 `ProcessStage` 中，插件 handler 先执行；handler 跑完后，框架判断：
+
+```python
+if (not event._has_send_oper
+    and event.is_at_or_wake_command   # 被 @ 或唤醒前缀
+    and not event.call_llm):
+    # 用 event.message_str（群友原话）走机器人原生 LLM 回复
+```
+
+本插件的 handler 命中关键词后，仅置 `event.is_at_or_wake_command = True`（并 `is_wake = True`），且**自身不发送消息、不中断事件**，于是上面的条件成立，原生回复接管。
 
 ## 安装
 
-### 方式一：放入插件目录（推荐，Docker 同样适用）
-
-AstrBot 的插件目录为 `data/plugins/`。在 Docker 部署中，`docker-compose.yml` 已将宿主机 `./data` 映射到容器内 `/AstrBot/data`，因此把本插件目录放到宿主机的 `data/plugins/` 下即可被容器加载：
+AstrBot 插件目录为 `data/plugins/`。Docker 部署中 `docker-compose.yml` 已将 `./data` 映射进容器，因此把本插件目录放到宿主机 `data/plugins/` 下即可被加载：
 
 ```
 data/plugins/astrbot_plugin_nyaa_keyword_reply/
@@ -25,18 +40,11 @@ data/plugins/astrbot_plugin_nyaa_keyword_reply/
 ├── main.py
 ├── metadata.yaml
 ├── _conf_schema.json
+├── logo.png
 └── requirements.txt
 ```
 
-放好后在 WebUI **插件管理**中刷新/重载插件，并在其**配置**页填写关键词。
-
-### 方式二：WebUI 插件市场 / 仓库地址安装
-
-在 WebUI 插件管理页填入本仓库地址安装：
-
-```
-https://github.com/NyaaCaster/astrbot_plugin_nyaa_keyword_reply
-```
+放好后**重启 AstrBot 容器**（或在 WebUI 重载插件），并在插件配置页填写关键词。
 
 ## 配置项
 
@@ -45,29 +53,20 @@ https://github.com/NyaaCaster/astrbot_plugin_nyaa_keyword_reply
 | `trigger_keywords` | 普通包含匹配的关键词列表 |
 | `regex_keywords` | 正则表达式关键词列表（高级） |
 | `case_sensitive` | 关键词是否区分大小写（默认否） |
-| `use_llm` | 是否调用 LLM 生成回复（默认是） |
-| `system_prompt` | LLM 人格设定 |
-| `llm_prompt_template` | 发给 LLM 的提示词模板，支持 `{sender}`/`{message}`/`{keyword}` |
-| `fixed_replies` | 固定回复，格式 `关键词=回复内容` |
-| `at_sender` | 回复时是否 @ 发言成员（默认是） |
-| `quote_message` | 回复时是否引用原消息（默认是） |
 | `enabled_groups` | 生效群白名单，留空对所有群生效 |
-| `trigger_chance_percent` | 触发概率（百分比），用于降低打扰 |
-| `cooldown_seconds` | 同群两次主动搭话的最小间隔秒数 |
+| `trigger_chance_percent` | 触发概率（百分比），降低打扰 |
+| `cooldown_seconds` | 同群两次触发的最小间隔秒数 |
 | `max_message_length` | 参与匹配的最大消息长度，0 表示不限 |
-| `stop_after_reply` | 回复后是否中断事件传播，避免重复回复（默认是） |
 
-## 工作原理
+> 注意：机器人自身的群聊白名单、会话开关、频率限制、内容安全等**仍照常生效**——本插件只负责"触发"，不绕过任何原生限制。
 
-1. 通过 `@filter.event_message_type(EventMessageType.GROUP_MESSAGE)` 监听群消息。
-2. 跳过已唤醒（被 @ / 唤醒词）的消息，避免与主对话流程重复。
-3. 命中关键词后，用 `provider.text_chat()` 生成回复文本。
-4. 用消息链 `[Reply, At, Plain]` 通过 `event.chain_result(...)` 发送，实现引用 + @ + 内容回复。
+## 回复行为说明
+
+回复是否 @ 发言成员、是否引用原消息、用什么人格和模型，**取决于 AstrBot 的平台配置与人格设置**（与机器人被 @ 时一致），不由本插件控制。想调整回复风格，请到 AstrBot 控制台对应配置处修改。
 
 ## 兼容性
 
 - 需要 AstrBot `>=4.0.0`。
-- 引用回复依赖平台对 `Reply` 组件的支持（QQ / aiocqhttp / NapCat 支持良好）。
 
 ## License
 
