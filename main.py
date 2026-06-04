@@ -109,7 +109,7 @@ class NyaaKeywordReplyPlugin(Star):
         if getattr(event, "is_at_or_wake_command", False):
             return
 
-        text = (event.get_plain_text() or "").strip()
+        text = (event.message_str or "").strip()
         if not text:
             return
         if self.max_message_length and len(text) > self.max_message_length:
