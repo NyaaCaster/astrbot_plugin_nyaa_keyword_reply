@@ -66,4 +66,4 @@ if (not event._has_send_oper
 
 ## License
 
-AGPL-3.0
+MIT
