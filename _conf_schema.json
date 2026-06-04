@@ -1,0 +1,94 @@
+{
+  "trigger_keywords": {
+    "description": "触发关键词（普通包含匹配）",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "hint": "群消息文本中包含任意一个关键词即触发。每行/每项一个词，例如：今天天气、推荐、求助。留空则不使用普通关键词匹配。",
+    "default": []
+  },
+  "regex_keywords": {
+    "description": "触发关键词（正则表达式）",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "hint": "高级用法：使用 Python 正则匹配整条消息文本，命中即触发。例如：^在吗.*、(救命|急).{0,4}$。不熟悉正则请留空。",
+    "default": []
+  },
+  "case_sensitive": {
+    "description": "关键词区分大小写",
+    "type": "bool",
+    "hint": "关闭时英文关键词不区分大小写（推荐关闭）。",
+    "default": false
+  },
+  "use_llm": {
+    "description": "使用 LLM 生成回复",
+    "type": "bool",
+    "hint": "开启后命中关键词时调用当前会话的 LLM 提供商生成回复（像群友一样接话）。关闭则只发送下方“固定回复”。",
+    "default": true
+  },
+  "system_prompt": {
+    "description": "LLM 人格设定（system prompt）",
+    "type": "text",
+    "hint": "用于约束 Bot 的语气与人设。",
+    "default": "你是潜水在 QQ 群里的一名普通群友，性格友好、说话简短口语化。看到有人聊到相关话题时，你会自然地接一句话，像真人插话一样，不要长篇大论，不要使用括号描述动作或神态。"
+  },
+  "llm_prompt_template": {
+    "description": "发给 LLM 的提示词模板",
+    "type": "text",
+    "hint": "可用占位符：{sender}=发言人昵称，{message}=对方原话，{keyword}=命中的关键词。",
+    "default": "群友「{sender}」刚刚在群里说：「{message}」。请你作为群里的一员，针对这句话自然地接一句话（30 字以内），口语、随意，不要复述对方原话，不要加任何前缀。"
+  },
+  "fixed_replies": {
+    "description": "固定回复（不走 LLM 时使用，或作为兜底）",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "hint": "格式：关键词=回复内容。例如：规则=本群守则：1.禁止刷屏 2.文明交流。命中固定回复时优先于 LLM。",
+    "default": []
+  },
+  "at_sender": {
+    "description": "回复时 @ 发言成员",
+    "type": "bool",
+    "default": true
+  },
+  "quote_message": {
+    "description": "回复时引用对方的原消息",
+    "type": "bool",
+    "hint": "在支持的平台（如 QQ/aiocqhttp）以“引用回复”的形式发送。",
+    "default": true
+  },
+  "enabled_groups": {
+    "description": "生效群白名单",
+    "type": "text",
+    "hint": "填写要启用本插件的 QQ 群号，按行或英文逗号分隔。留空表示对所有群生效。",
+    "default": ""
+  },
+  "trigger_chance_percent": {
+    "description": "触发概率（百分比）",
+    "type": "int",
+    "hint": "命中关键词后按此概率实际回复，用于降低打扰感。100 表示每次必回，30 表示约三次命中回一次。",
+    "default": 100
+  },
+  "cooldown_seconds": {
+    "description": "同群冷却时间（秒）",
+    "type": "int",
+    "hint": "同一个群两次主动搭话之间至少间隔的秒数，防止刷屏。",
+    "default": 15
+  },
+  "max_message_length": {
+    "description": "参与匹配的最大消息长度",
+    "type": "int",
+    "hint": "超过该长度的消息（通常是长文/复制粘贴）不参与关键词触发，0 表示不限制。",
+    "default": 200
+  },
+  "stop_after_reply": {
+    "description": "回复后中断事件传播",
+    "type": "bool",
+    "hint": "开启后命中并回复的消息不再继续交给其它插件或主 LLM 管道处理，避免重复回复（推荐开启）。",
+    "default": true
+  }
+}

@@ -1,0 +1,8 @@
+name: astrbot_plugin_nyaa_keyword_reply
+display_name: Nyaa简易关键字回复
+desc: 监听群成员发言，命中关键词后引用并@对方，调用 LLM 像群友一样自然接话。
+help: 在 WebUI 插件配置页填写触发关键词；命中后 Bot 会引用+@发言成员并由 LLM 生成回复。
+version: 1.0.0
+author: NyaaCaster
+repo: https://github.com/NyaaCaster/astrbot_plugin_nyaa_keyword_reply
+astrbot_version: ">=4.0.0"
