@@ -38,8 +38,8 @@ __signature__ = "Nyaa be with you."
 @register(
     "astrbot_plugin_nyaa_keyword_reply",
     "NyaaCaster",
-    "群聊关键词触发：命中关键词即按机器人原生唤醒逻辑回复（复用 bot 自身的 provider/人格/上下文）。",
-    "2.0.0",
+    "群聊关键词触发：命中关键词即按机器人原生唤醒逻辑回复（复用 bot 自身的 provider/人格/上下文）；支持 QQ 号黑名单彻底忽略其群聊唤醒。",
+    "2.1.0",
     "https://github.com/NyaaCaster/astrbot_plugin_nyaa_keyword_reply",
 )
 class NyaaKeywordReplyPlugin(Star):
@@ -79,6 +79,14 @@ class NyaaKeywordReplyPlugin(Star):
         self.cooldown_seconds: float = max(0.0, float(cfg.get("cooldown_seconds", 15)))
         self.max_message_length: int = int(cfg.get("max_message_length", 200))
 
+        # 黑名单 QQ 号：命中则彻底无视该用户的群聊唤醒（关键词 / @ / 唤醒词）。
+        # aiocqhttp(OneBot) 下 event.get_sender_id() 返回的就是发送者 QQ 号字符串。
+        self.blacklist_user_ids: set = {
+            str(u).strip()
+            for u in cfg.get("blacklist_user_ids", [])
+            if str(u).strip()
+        }
+
     @staticmethod
     def _parse_id_set(raw) -> set:
         if not raw:
@@ -105,6 +113,23 @@ class NyaaKeywordReplyPlugin(Star):
     # ------------------------------------------------------------------ #
     @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
+        sender_id = str(event.get_sender_id() or "")
+
+        # 黑名单（最高优先级）：彻底无视该 QQ 号的一切群聊唤醒——关键词、@、唤醒词皆然。
+        # 若该消息已被原生唤醒（如 @ 机器人），撤销唤醒标志并中止管道，使机器人不回应。
+        if sender_id and sender_id in self.blacklist_user_ids:
+            if getattr(event, "is_wake", False) or getattr(
+                event, "is_at_or_wake_command", False
+            ):
+                event.is_wake = False
+                event.is_at_or_wake_command = False
+                event.call_llm = True  # 禁止默认 LLM 回复（与下方 stop_event 双保险）
+                event.stop_event()  # 置 _has_stopped，scheduler 在 stage 间 break 后续处理
+                logger.info(
+                    f"[nyaa_keyword_reply] 黑名单用户 {sender_id} 的群聊唤醒已被拦截并忽略。"
+                )
+            return
+
         # 该消息本就已唤醒机器人（被 @ / 唤醒词 / 引用 bot），无需介入，避免重复。
         if getattr(event, "is_at_or_wake_command", False):
             return
@@ -116,7 +141,6 @@ class NyaaKeywordReplyPlugin(Star):
             return
 
         # 不处理机器人自己的消息（保险）。
-        sender_id = str(event.get_sender_id() or "")
         self_id = str(getattr(event, "get_self_id", lambda: "")() or "")
         if sender_id and self_id and sender_id == self_id:
             return

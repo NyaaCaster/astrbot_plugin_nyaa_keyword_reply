@@ -23,6 +23,15 @@
     "hint": "关闭时英文关键词不区分大小写（推荐关闭）。",
     "default": false
   },
+  "blacklist_user_ids": {
+    "description": "黑名单 QQ 号",
+    "type": "list",
+    "items": {
+      "type": "string"
+    },
+    "hint": "填写要彻底忽略的发送者 QQ 号，每项一个。命中后机器人将无视该用户的全部群聊唤醒——不仅关键词不触发，连被该用户 @ 或唤醒词唤醒也一并忽略。优先级最高，先于关键词/白名单判断。留空表示不启用黑名单。",
+    "default": []
+  },
   "enabled_groups": {
     "description": "生效群白名单",
     "type": "text",

@@ -2,7 +2,7 @@ name: astrbot_plugin_nyaa_keyword_reply
 display_name: Nyaa简易关键字回复
 desc: 群聊关键词触发器：命中关键词即按机器人原生唤醒逻辑回复，复用 bot 自身的 provider / 人格 / 上下文。
 help: 在 WebUI 插件配置页填写触发关键词；群成员发言命中后，机器人会像被 @ 一样原生回复。
-version: 2.0.0
+version: 2.1.0
 author: NyaaCaster
 repo: https://github.com/NyaaCaster/astrbot_plugin_nyaa_keyword_reply
 astrbot_version: ">=4.0.0"
