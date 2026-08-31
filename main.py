@@ -39,7 +39,7 @@ __signature__ = "Nyaa be with you."
     "astrbot_plugin_nyaa_keyword_reply",
     "NyaaCaster",
     "群聊关键词触发：命中关键词即按机器人原生唤醒逻辑回复（复用 bot 自身的 provider/人格/上下文）；支持 QQ 号黑名单彻底忽略其群聊唤醒。",
-    "2.1.0",
+    "2.1.1",
     "https://github.com/NyaaCaster/astrbot_plugin_nyaa_keyword_reply",
 )
 class NyaaKeywordReplyPlugin(Star):
@@ -48,12 +48,29 @@ class NyaaKeywordReplyPlugin(Star):
         self.config = config or {}
         # 每个群上次触发时间，用于冷却控制。
         self._last_trigger_at: Dict[str, float] = {}
-        self._reload_config()
+        # 注意：不在 __init__ 里解析配置快照——AstrBot 的插件配置对象可能在
+        # 运行中被原地更新（AstrBotConfig.save_config 的 self.update），且插件
+        # 会因 WebUI 保存配置被热重载；为保证黑名单/关键词永远反映最新配置，
+        # 改为在 on_group_message 每次执行时实时同步（见 _sync_runtime_config）。
+        self._sync_runtime_config()
 
     # ------------------------------------------------------------------ #
     # 配置解析
     # ------------------------------------------------------------------ #
-    def _reload_config(self) -> None:
+    def _sync_runtime_config(self) -> None:
+        """实时同步运行所需配置。
+
+        每次消息处理时都会调用，代价极小（解析一个小配置 dict），换来：
+        1. WebUI 保存配置后（AstrBotConfig 被原地 update），无需等待插件
+           重载即生效；
+        2. 插件热重载/配置漂移后，黑名单与关键词永远反映最新配置，杜绝
+           因初始化快照陈旧导致的黑名单失效。
+
+        注意：AstrBot 在「保存插件配置 → reload 插件」的重载窗口内，本插件
+        on_group_message handler 会被临时解绑（_unbind_plugin），此时任何
+        插件逻辑都无法拦截消息——这是 AstrBot 核心 reload 机制的固有限制，
+        插件层面只能通过实时同步把其余失效路径全部消除。
+        """
         cfg = self.config
 
         self.trigger_keywords: List[str] = [
@@ -113,6 +130,11 @@ class NyaaKeywordReplyPlugin(Star):
     # ------------------------------------------------------------------ #
     @filter.event_message_type(EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
+        # 每条消息实时同步配置（见 _sync_runtime_config 注释）：
+        # 保证黑名单与关键词始终是最新值，即使配置对象被原地 update 或
+        # 插件刚被热重载，也无需等待初始化快照。
+        self._sync_runtime_config()
+
         sender_id = str(event.get_sender_id() or "")
 
         # 黑名单（最高优先级）：彻底无视该 QQ 号的一切群聊唤醒——关键词、@、唤醒词皆然。
